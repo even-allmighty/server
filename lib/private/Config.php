@@ -48,6 +48,10 @@ class Config {
 	public const ENV_PREFIX = 'NC_';
 
 	/** @var array Associative array ($key => $value) */
+	protected $defaultConfigCache = [];
+	/** @var array Associative array ($key => $value) */
+	protected $additionalConfigCache = [];
+	/** @var array Associative array ($key => $value) */
 	protected $cache = [];
 	/** @var array */
 	protected $envCache = [];
@@ -154,9 +158,11 @@ class Config {
 	 */
 	protected function set($key, $value) {
 		$this->checkReadOnly();
+		$this->checkFromAdditional($key);
 
 		if (!isset($this->cache[$key]) || $this->cache[$key] !== $value) {
 			// Add change
+			$this->defaultConfigCache[$key] = $value;
 			$this->cache[$key] = $value;
 			return true;
 		}
@@ -186,10 +192,12 @@ class Config {
 	 */
 	protected function delete($key) {
 		$this->checkReadOnly();
+		$this->checkFromAdditional($key);
 
 		if (isset($this->cache[$key])) {
 			// Delete key from cache
 			unset($this->cache[$key]);
+			unset($this->defaultConfigCache[$key]);
 			return true;
 		}
 		return false;
@@ -240,13 +248,19 @@ class Config {
 				throw new \Exception($errorMessage);
 			}
 			if (isset($CONFIG) && is_array($CONFIG)) {
-				$this->cache = array_merge($this->cache, $CONFIG);
+				if ($file === $this->configFilePath){
+					$this->defaultConfigCache = $CONFIG;
+				}else{
+					$this->additionalConfigCache = array_merge($this->additionalConfigCache, $CONFIG);
+				}
 			}
 
 			// Close the file pointer and release the lock
 			flock($filePointer, LOCK_UN);
 			fclose($filePointer);
 		}
+
+		$this->cache = array_merge($this->defaultConfigCache, $this->additionalConfigCache);
 
 		$this->envCache = getenv();
 	}
@@ -269,7 +283,7 @@ class Config {
 		// Create a php file ...
 		$content = "<?php\n";
 		$content .= '$CONFIG = ';
-		$content .= var_export($this->cache, true);
+		$content .= var_export($this->defaultConfigCache, true);
 		$content .= ";\n";
 
 		touch($this->configFilePath);
@@ -310,6 +324,18 @@ class Config {
 			throw new HintException(
 				'Config is set to be read-only via option "config_is_read_only".',
 				'Unset "config_is_read_only" to allow changes to the config file.');
+		}
+	}
+
+	/**
+	 * @throws HintException
+	 */
+	private function checkFromAdditional($key): void {
+		if (isset($this->additionalConfigCache[$key])) {
+			throw new HintException(
+				"The key " . $key . " is set in an additional config file and can not be changed. "
+				. "Please contact your system administrator."
+			);
 		}
 	}
 }

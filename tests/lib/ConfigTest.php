@@ -159,12 +159,16 @@ class ConfigTest extends TestCase {
 		$this->assertSame('totallyOutdated', $config->getValue('php53', 'bogusValue'));
 		$this->assertEquals(self::TESTCONTENT, file_get_contents($this->configFile));
 
-		// Write a new value to the config
+		// Write a new value to the base config
 		$config->setValue('CoolWebsites', ['demo.owncloud.org', 'owncloud.org', 'owncloud.com']);
 		$expected = "<?php\n\$CONFIG = array (\n  'foo' => 'bar',\n  'beers' => \n  array (\n    0 => 'Appenzeller',\n  " .
-			"  1 => 'Guinness',\n    2 => 'Kölsch',\n  ),\n  'alcohol_free' => false,\n  'php53' => 'totallyOutdated',\n  'CoolWebsites' => \n  array (\n  " .
+			"  1 => 'Guinness',\n    2 => 'Kölsch',\n  ),\n  'alcohol_free' => false,\n  'CoolWebsites' => \n  array (\n  " .
 			"  0 => 'demo.owncloud.org',\n    1 => 'owncloud.org',\n    2 => 'owncloud.com',\n  ),\n);\n";
 		$this->assertEquals($expected, file_get_contents($this->configFile));
+
+		// Make sure we can't overwrite a setting from an additional config
+		$this->expectException(\OCP\HintException::class);
+		$config->setValue('php53', "totallyNotOutdated");
 
 		// Cleanup
 		unlink($additionalConfigPath);
